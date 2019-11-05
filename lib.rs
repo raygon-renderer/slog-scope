@@ -22,7 +22,7 @@
 //! It is generally advised **NOT** to use `slog_scope` in libraries. Read more in
 //! [slog-rs FAQ](https://github.com/slog-rs/slog/wiki/FAQ#do-i-have-to-pass-logger-around)
 //!
-//! ```
+//! ```ignore
 //! #[macro_use(slog_o, slog_info, slog_log, slog_record, slog_record_static, slog_b, slog_kv)]
 //! extern crate slog;
 //! #[macro_use]
@@ -54,51 +54,93 @@
 #![warn(missing_docs)]
 
 #[macro_use(o)]
-extern crate slog;
+pub extern crate slog;
+
 #[macro_use]
 extern crate lazy_static;
 extern crate arc_swap;
 
-use slog::{Logger, Record, OwnedKVList};
+use slog::{Logger, OwnedKVList, Record};
 
-use std::sync::Arc;
-use std::cell::RefCell;
 use arc_swap::ArcSwap;
+use std::cell::RefCell;
+use std::sync::Arc;
 
 use std::result;
 
-pub use slog::{slog_crit, slog_debug, slog_error, slog_info, slog_trace, slog_warn};
+/// Log a message using current scope logger
+#[macro_export]
+macro_rules! log(($lvl:expr, $($args:tt)+) => {
+    if $lvl.as_usize() <= $crate::slog::__slog_static_max_level().as_usize() {
+        $crate::with_logger(|logger| $crate::slog::slog_log![logger, $lvl, $($args)+])
+    }
+};);
 
 /// Log a critical level message using current scope logger
 #[macro_export]
-macro_rules! crit( ($($args:tt)+) => {
-    $crate::with_logger(|logger| $crate::slog_crit![logger, $($args)+])
-};);
+macro_rules! crit {
+    (#$tag:expr, $($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Critical, $tag, $($args)+)
+    };
+    ($($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Critical, "", $($args)+)
+    };
+}
+
 /// Log a error level message using current scope logger
 #[macro_export]
-macro_rules! error( ($($args:tt)+) => {
-    $crate::with_logger(|logger| $crate::slog_error![logger, $($args)+])
-};);
+macro_rules! error {
+    (#$tag:expr, $($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Error, $tag, $($args)+)
+    };
+    ($($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Error, "", $($args)+)
+    };
+}
+
 /// Log a warning level message using current scope logger
 #[macro_export]
-macro_rules! warn( ($($args:tt)+) => {
-    $crate::with_logger(|logger| $crate::slog_warn![logger, $($args)+])
-};);
+macro_rules! warn {
+    (#$tag:expr, $($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Warning, $tag, $($args)+)
+    };
+    ($($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Warning, "", $($args)+)
+    };
+}
+
 /// Log a info level message using current scope logger
 #[macro_export]
-macro_rules! info( ($($args:tt)+) => {
-    $crate::with_logger(|logger| $crate::slog_info![logger, $($args)+])
-};);
+macro_rules! info {
+    (#$tag:expr, $($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Info, $tag, $($args)+)
+    };
+    ($($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Info, "", $($args)+)
+    };
+}
+
 /// Log a debug level message using current scope logger
 #[macro_export]
-macro_rules! debug( ($($args:tt)+) => {
-    $crate::with_logger(|logger| $crate::slog_debug![logger, $($args)+])
-};);
+macro_rules! debug {
+    (#$tag:expr, $($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Debug, $tag, $($args)+)
+    };
+    ($($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Debug, "", $($args)+)
+    };
+}
+
 /// Log a trace level message using current scope logger
 #[macro_export]
-macro_rules! trace( ($($args:tt)+) => {
-    $crate::with_logger(|logger| $crate::slog_trace![logger, $($args)+])
-};);
+macro_rules! trace {
+    (#$tag:expr, $($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Critical, $tag, $($args)+)
+    };
+    ($($args:tt)+) => {
+        $crate::log!($crate::slog::Level::Trace, "", $($args)+)
+    };
+}
 
 thread_local! {
     static TL_SCOPES: RefCell<Vec<*const slog::Logger>> = RefCell::new(Vec::with_capacity(8))
